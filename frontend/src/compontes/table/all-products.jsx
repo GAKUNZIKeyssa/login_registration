@@ -47,7 +47,7 @@ function ProductTable() {
                 <td>{product.price}</td>
                 {/* <td>{product.items}</td> */}
                 <td>{product.category_name || product.category}</td>
-                <td>{product.expiry_date ? new Date(product.expiry_date).toLocaleDateString() : 'N/A'}</td>
+                <td>{product.expiry_date}</td>
               </tr>
             ))
           )}
