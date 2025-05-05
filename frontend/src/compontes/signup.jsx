@@ -36,6 +36,7 @@ function SignupComponent() {
     } catch (err) {
       setMessage(err.response?.data || 'Error submitting form');
     }
+    console.log(formData)
   };
 
   const fetchUsers = async () => {

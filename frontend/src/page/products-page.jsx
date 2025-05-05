@@ -4,7 +4,7 @@ import ProductTable from '../compontes/table/all-products'
 
 const ProductPage = () => {
   return (
-    <div>
+    <div className=' flex'>
         <AddProduct />
         <ProductTable />
     </div>

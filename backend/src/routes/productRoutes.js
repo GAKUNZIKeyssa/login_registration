@@ -15,6 +15,8 @@ router.post('/products', addProduct);
 // READ all products
 router.get('/products', getAllProducts);
 
+router.get('/products/search', searchProducts);
+
 // READ a single product by ID
 router.get('/products/:id', getProductById);
 
@@ -22,7 +24,6 @@ router.get('/products/:id', getProductById);
 router.put('/products/:id', updateProduct);
 
 // DELETE a product by ID
-router.get('/products/search', searchProducts);
 router.delete('/products/:id', deleteProduct);
 
 
