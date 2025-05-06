@@ -6,6 +6,7 @@ const authRoutes = require('./routes/authRoutes');
 const userRoutes = require('./routes/userRoutes');
 const productRoutes = require('./routes/productRoutes');
 const categoryRoutes = require('./routes/categoryRoutes');
+const salesRoutes = require('./routes/salesRoutes');
 require('./config/db'); // Ensure DB connection is made
 
 const app = express();
@@ -18,6 +19,7 @@ app.get('/', (req, res) => {
 });
 
 // Routes
+app.use(salesRoutes);
 app.use(authRoutes);
 app.use(userRoutes);
 app.use(productRoutes);

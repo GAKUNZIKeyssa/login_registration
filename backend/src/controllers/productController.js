@@ -27,30 +27,29 @@ exports.addProduct = (req, res) => {
 
 // READ all products
 exports.getAllProducts = (req, res) => {
-    // SQL query string literal - cannot contain JavaScript comments inside
-    const sql = `
-      SELECT
-        products.id,
-        products.name,
-        products.price,
-        products.items,
-        products.expiry_date,
-        products.categories
-        categories.name AS category
-      FROM
-        products
-      JOIN
-        categories ON products.category_id = categories.id
-    `; // Ensure no trailing comma before FROM
+  const sql = `
+    SELECT
+      products.id,
+      products.name,
+      products.price,
+      products.items,
+      products.expiry_date,
+      products.category_id,
+      products.created_at,
+      categories.name AS category
+    FROM
+      products
+    JOIN
+      categories ON products.category_id = categories.id
+  `;
 
-    db.query(sql, (err, results) => {
-        if (err) {
-            console.error('Database error:', err); // Log the detailed error on the server
-            // Send a more generic error message to the client
-            return res.status(500).json({ message: 'Failed to fetch products due to a database issue.' });
-        }
-        res.status(200).json(results);
-    });
+  db.query(sql, (err, results) => {
+      if (err) {
+          console.error('Database error:', err);
+          return res.status(500).json({ message: 'Failed to fetch products due to a database issue.' });
+      }
+      res.status(200).json(results);
+  });
 };
 
 // READ a single product
@@ -137,5 +136,55 @@ exports.searchProducts = (req, res) => {
     }
 
     res.status(200).json(results);
+  });
+};
+
+// GET /products/expiry-filter?type=month OR ?type=date&value=2025-05-10
+exports.filterByExpiry = (req, res) => {
+  const { type, value } = req.query;
+  let sql = `
+      SELECT 
+          products.id,
+          products.name,
+          products.price,
+          products.items,
+          products.expiry_date,
+          products.category_id,
+          products.created_at,
+          categories.name AS category
+      FROM 
+          products
+      JOIN 
+          categories ON products.category_id = categories.id
+      WHERE 
+  `;
+
+  switch (type) {
+      case 'today':
+          sql += `DATE(products.expiry_date) = CURDATE()`;
+          break;
+      case 'week':
+          sql += `YEARWEEK(products.expiry_date, 1) = YEARWEEK(CURDATE(), 1)`;
+          break;
+      case 'month':
+          sql += `MONTH(products.expiry_date) = MONTH(CURDATE()) AND YEAR(products.expiry_date) = YEAR(CURDATE())`;
+          break;
+      case 'year':
+          sql += `YEAR(products.expiry_date) = YEAR(CURDATE())`;
+          break;
+      case 'date':
+          if (!value) return res.status(400).json({ message: 'Date value is required for custom date filter.' });
+          sql += `DATE(products.expiry_date) = ?`;
+          break;
+      default:
+          return res.status(400).json({ message: 'Invalid filter type.' });
+  }
+
+  db.query(sql, [value], (err, results) => {
+      if (err) {
+          console.error('Error filtering products:', err);
+          return res.status(500).json({ message: 'Database error during expiry filter.' });
+      }
+      res.status(200).json(results);
   });
 };

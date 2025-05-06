@@ -2,43 +2,39 @@ import { useEffect, useState, useCallback } from 'react';
 import axios from 'axios';
 import debounce from 'lodash.debounce';
 
-// Helper to format date for input type="date"
 const formatDateForInput = (dateString) => {
     if (!dateString) return '';
     try {
-        // Assumes dateString is in a format recognized by Date constructor (like ISO 8601)
         const date = new Date(dateString);
-        return date.toISOString().split('T')[0]; // Returns YYYY-MM-DD
-    } catch (e) {
-        console.error("Error parsing date:", dateString, e);
-        return ''; // Return empty or a default if parsing fails
+        return date.toISOString().split('T')[0];
+    } catch {
+        return '';
     }
 };
 
-
-function ProductTable() {
+function AllProducts() {
     const [products, setProducts] = useState([]);
     const [query, setQuery] = useState('');
-    const [message, setMessage] = useState(''); // For feedback messages
-    const [error, setError] = useState(''); // For error messages
-
-    // --- Modal State ---
+    const [message, setMessage] = useState('');
+    const [error, setError] = useState('');
     const [isModalOpen, setIsModalOpen] = useState(false);
-    const [editingProduct, setEditingProduct] = useState(null); // Store the whole product being edited
+    const [editingProduct, setEditingProduct] = useState(null);
     const [editFormData, setEditFormData] = useState({
         id: '',
         name: '',
         price: '',
         items: '',
-        category_id: '', // Use category_id for the form
+        category_id: '',
         expiry_date: '',
     });
-    const [categories, setCategories] = useState([]); // For category dropdown in modal
+    const [categories, setCategories] = useState([]);
 
-    // --- Fetch Categories (for Edit Modal) ---
+    const [expiryFilter, setExpiryFilter] = useState('');
+    const [customExpiryDate, setCustomExpiryDate] = useState('');
+
     const fetchCategories = async () => {
         try {
-            setError(''); // Clear previous errors
+            setError('');
             const response = await axios.get('http://localhost:3001/categories');
             setCategories(response.data);
         } catch (err) {
@@ -47,57 +43,39 @@ function ProductTable() {
         }
     };
 
-    // --- Fetch Products ---
     const fetchProducts = useCallback(async (search = '') => {
         try {
-            setMessage(''); // Clear messages on fetch
             setError('');
             const url = search
                 ? `http://localhost:3001/products/search?query=${encodeURIComponent(search)}`
                 : `http://localhost:3001/products`;
             const res = await axios.get(url);
-            // Ensure category_id is present (requires backend update)
-             if (res.data.length > 0 && res.data[0].category_id === undefined) {
-                 console.warn("Warning: `category_id` is missing from fetched products. Please update backend `getAllProducts` and `searchProducts` queries.");
-             }
             setProducts(res.data);
         } catch (err) {
             console.error('Failed to fetch products:', err);
             setError('Failed to fetch products. Please ensure the backend is running.');
-            setProducts([]); // Clear products on error
+            setProducts([]);
         }
-    }, []); // Empty dependency array means this function definition doesn't change
+    }, []);
 
-    // --- Initial Fetch ---
-    useEffect(() => {
-        fetchProducts(); // Initial load
-        fetchCategories(); // Load categories for modal
-    }, [fetchProducts]); // Depend on fetchProducts
-
-    // --- Debounced Search ---
     const debouncedSearch = useCallback(
         debounce((value) => {
             fetchProducts(value);
         }, 300),
-        [fetchProducts] // Depend on fetchProducts
+        [fetchProducts]
     );
 
-    // --- Handle Search Input ---
     const handleSearch = (e) => {
         const value = e.target.value;
         setQuery(value);
         debouncedSearch(value);
     };
 
-    // --- Handle Delete ---
     const handleDelete = async (productId) => {
         if (window.confirm(`Are you sure you want to delete product ID ${productId}?`)) {
             try {
-                setMessage('');
-                setError('');
                 await axios.delete(`http://localhost:3001/products/${productId}`);
                 setMessage(`✅ Product ${productId} deleted successfully!`);
-                // Remove product from local state
                 setProducts(products.filter(p => p.id !== productId));
             } catch (err) {
                 console.error('Failed to delete product:', err);
@@ -106,30 +84,24 @@ function ProductTable() {
         }
     };
 
-    // --- Handle Edit Modal ---
     const handleOpenEditModal = (product) => {
-        if (!product.category_id) {
-             console.error("Cannot edit product: `category_id` is missing.", product);
-             setError("Cannot edit product: category information is missing. Please update backend.");
-             return; // Prevent opening modal if category_id is missing
-        }
         setEditingProduct(product);
         setEditFormData({
             id: product.id,
             name: product.name,
             price: product.price,
             items: product.items,
-            category_id: product.category_id, // Use the ID here
-            expiry_date: formatDateForInput(product.expiry_date), // Format date for input
+            category_id: product.category_id,
+            expiry_date: formatDateForInput(product.expiry_date),
         });
         setIsModalOpen(true);
-        setMessage(''); // Clear messages when opening modal
+        setMessage('');
         setError('');
     };
 
     const handleCloseModal = () => {
         setIsModalOpen(false);
-        setEditingProduct(null); // Clear editing state
+        setEditingProduct(null);
     };
 
     const handleEditFormChange = (e) => {
@@ -137,103 +109,122 @@ function ProductTable() {
         setEditFormData(prev => ({ ...prev, [name]: value }));
     };
 
-    // --- Handle Update Submit ---
     const handleUpdateSubmit = async (e) => {
         e.preventDefault();
-        if (!editingProduct) return;
-
-        // Basic validation (optional, add more as needed)
-        if (!editFormData.name || !editFormData.price || !editFormData.items || !editFormData.category_id || !editFormData.expiry_date) {
-             setError("All fields are required in the edit form.");
-             return;
-        }
-
-        // Prepare data for backend (map category_id back to 'category' as expected by backend controller)
-        // **Important Correction:** Your backend `updateProduct` actually expects `category` to be the ID.
-        // So, we send `category_id` as `category`.
         const dataToSend = {
-             name: editFormData.name,
-             price: parseFloat(editFormData.price), // Ensure price is number
-             items: parseInt(editFormData.items, 10), // Ensure items is integer
-             category: parseInt(editFormData.category_id, 10), // Send category_id as 'category'
-             expiryDate: editFormData.expiry_date, // Send formatted date string
+            name: editFormData.name,
+            price: parseFloat(editFormData.price),
+            items: parseInt(editFormData.items, 10),
+            category: parseInt(editFormData.category_id, 10),
+            expiryDate: editFormData.expiry_date,
         };
-
-
         try {
-            setMessage('');
-            setError('');
             await axios.put(`http://localhost:3001/products/${editingProduct.id}`, dataToSend);
             setMessage(`✅ Product ${editingProduct.id} updated successfully!`);
             handleCloseModal();
-            // Refresh the product list to show updated data
-            fetchProducts(query); // Re-fetch with current query
+            fetchProducts(query);
         } catch (err) {
             console.error('Failed to update product:', err);
-            setError(`❌ Failed to update product ${editingProduct.id}. ${err.response?.data?.message || ''}`);
+            setError(`❌ Failed to update product ${editingProduct.id}.`);
         }
     };
 
+    const handleExpiryFilter = async () => {
+        try {
+            if (!expiryFilter) return fetchProducts();
+            let url = `http://localhost:3001/products/expiry-filter?type=${expiryFilter}`;
+            if (expiryFilter === 'date') {
+                if (!customExpiryDate) {
+                    setError('Please select a date.');
+                    return;
+                }
+                url += `&value=${customExpiryDate}`;
+            }
+            const res = await axios.get(url);
+            setProducts(res.data);
+            setMessage(`Showing products expiring: ${expiryFilter === 'date' ? customExpiryDate : expiryFilter}`);
+        } catch (err) {
+            console.error('Error filtering expiry:', err);
+            setError('Failed to filter products by expiry date.');
+        }
+    };
+
+    useEffect(() => {
+        fetchProducts();
+        fetchCategories();
+    }, [fetchProducts]);
+
     return (
-        <div className="overflow-x-auto max-w-4xl mx-auto mt-10 p-4">
-            <h2 className="text-2xl font-bold text-center mb-4">Product List</h2>
+        <div className="max-w-5xl mx-auto p-4">
+            <h2 className="text-2xl font-bold text-center mb-4">All Products</h2>
 
-            {/* Feedback Messages */}
-            {message && <div className="alert alert-success shadow-lg mb-4"><div><span>{message}</span></div></div>}
-            {error && <div className="alert alert-error shadow-lg mb-4"><div><span>{error}</span></div></div>}
+            {/* {message && <div className="alert alert-success mb-4"><span>{message}</span></div>} */}
+            {error && <div className="alert alert-error mb-4"><span>{error}</span></div>}
 
-
-            <div className="mb-4 text-center">
+            <div className="mb-4 flex flex-col sm:flex-row items-center gap-4">
                 <input
                     type="text"
-                    placeholder="Search by name, ID, or category..."
+                    placeholder="Search..."
                     value={query}
                     onChange={handleSearch}
-                    className="input input-bordered w-full max-w-md"
+                    className="input input-bordered w-full max-w-xs"
                 />
+
+                <select
+                    className="select select-bordered"
+                    value={expiryFilter}
+                    onChange={(e) => setExpiryFilter(e.target.value)}
+                >
+                    <option value="">-- Filter by Expiry --</option>
+                    <option value="today">Today</option>
+                    <option value="week">This Week</option>
+                    <option value="month">This Month</option>
+                    <option value="year">This Year</option>
+                    <option value="date">Custom Date</option>
+                </select>
+
+                {expiryFilter === 'date' && (
+                    <input
+                        type="date"
+                        className="input input-bordered"
+                        value={customExpiryDate}
+                        onChange={(e) => setCustomExpiryDate(e.target.value)}
+                    />
+                )}
+
+                <button className="btn btn-primary" onClick={handleExpiryFilter}>Filter</button>
             </div>
 
-            <div className="overflow-x-auto"> {/* Added for better table responsiveness */}
+            <div className="overflow-x-auto">
                 <table className="table table-zebra w-full">
                     <thead>
                         <tr>
-                            <th>Id</th>
+                            <th>ID</th>
                             <th>Name</th>
-                            <th>Price ($)</th>
+                            <th>Price</th>
                             <th>Items</th>
                             <th>Category</th>
                             <th>Expiry Date</th>
-                            <th>Actions</th> {/* Added Actions Header */}
+                            <th>Created At</th>
+                            <th>Actions</th>
                         </tr>
                     </thead>
                     <tbody>
                         {products.length === 0 ? (
-                            <tr><td colSpan="7" className="text-center">No products found</td></tr> // Updated colSpan
+                            <tr><td colSpan="8" className="text-center">No products found</td></tr>
                         ) : (
-                            products.map((product) => (
+                            products.map(product => (
                                 <tr key={product.id}>
                                     <td>{product.id}</td>
                                     <td>{product.name}</td>
-                                    <td>{product.price}</td>
+                                    <td>${product.price}</td>
                                     <td>{product.items}</td>
-                                    {/* Display category name, use category_id for logic */}
                                     <td>{product.category || 'N/A'}</td>
                                     <td>{formatDateForInput(product.expiry_date)}</td>
+                                    <td>{formatDateForInput(product.created_at)}</td>
                                     <td>
-                                        <button
-                                            className="btn btn-sm btn-warning mr-2"
-                                            onClick={() => handleOpenEditModal(product)}
-                                            disabled={!product.category_id} // Disable if category_id is missing
-                                            title={!product.category_id ? "Cannot edit: Category ID missing" : "Edit Product"}
-                                        >
-                                            Edit
-                                        </button>
-                                        <button
-                                            className="btn btn-sm btn-error"
-                                            onClick={() => handleDelete(product.id)}
-                                        >
-                                            Delete
-                                        </button>
+                                        <button className="btn btn-sm btn-warning mr-2" onClick={() => handleOpenEditModal(product)}>Edit</button>
+                                        <button className="btn btn-sm btn-error" onClick={() => handleDelete(product.id)}>Delete</button>
                                     </td>
                                 </tr>
                             ))
@@ -242,81 +233,34 @@ function ProductTable() {
                 </table>
             </div>
 
-            {/* --- Edit Product Modal --- */}
-            {isModalOpen && editingProduct && (
-                <div className={`modal ${isModalOpen ? 'modal-open' : ''}`}>
+            {isModalOpen && (
+                <div className="modal modal-open">
                     <div className="modal-box relative">
-                        <button
-                            className="btn btn-sm btn-circle absolute right-2 top-2"
-                            onClick={handleCloseModal}
-                        >✕</button>
-                        <h3 className="text-lg font-bold mb-4">Edit Product (ID: {editingProduct.id})</h3>
+                        <button className="btn btn-sm btn-circle absolute right-2 top-2" onClick={handleCloseModal}>✕</button>
+                        <h3 className="text-lg font-bold mb-4">Edit Product</h3>
 
-                        {/* Edit Form */}
                         <form onSubmit={handleUpdateSubmit} className="space-y-4">
-                             {error && <div className="alert alert-error shadow-lg mb-4"><div><span>{error}</span></div></div>}
-                            <input
-                                className="input input-bordered w-full"
-                                type="text"
-                                name="name"
-                                placeholder="Product Name"
-                                value={editFormData.name}
-                                onChange={handleEditFormChange}
-                                required
-                            />
-                            <input
-                                className="input input-bordered w-full"
-                                type="number"
-                                name="price"
-                                placeholder="Price"
-                                step="0.01" // Allow decimals for price
-                                value={editFormData.price}
-                                onChange={handleEditFormChange}
-                                required
-                            />
-                            <input
-                                className="input input-bordered w-full"
-                                type="number"
-                                name="items"
-                                placeholder="Number of Items"
-                                value={editFormData.items}
-                                onChange={handleEditFormChange}
-                                required
-                            />
-                            <select
-                                className="select select-bordered w-full"
-                                name="category_id" // Use category_id in form state
-                                value={editFormData.category_id} // Bind to category_id
-                                onChange={handleEditFormChange}
-                                required
-                            >
-                                <option value="" disabled>Select Category</option>
-                                {categories.map((cat) => (
-                                    <option key={cat.id} value={cat.id}>
-                                        {cat.name}
-                                    </option>
+                            <input className="input input-bordered w-full" type="text" name="name" value={editFormData.name} onChange={handleEditFormChange} placeholder="Name" required />
+                            <input className="input input-bordered w-full" type="number" name="price" value={editFormData.price} onChange={handleEditFormChange} placeholder="Price" required />
+                            <input className="input input-bordered w-full" type="number" name="items" value={editFormData.items} onChange={handleEditFormChange} placeholder="Items" required />
+                            <select className="select select-bordered w-full" name="category_id" value={editFormData.category_id} onChange={handleEditFormChange} required>
+                                <option value="">Select Category</option>
+                                {categories.map(cat => (
+                                    <option key={cat.id} value={cat.id}>{cat.name}</option>
                                 ))}
                             </select>
-                            <input
-                                className="input input-bordered w-full"
-                                type="date"
-                                name="expiry_date" // Use expiry_date in form state
-                                value={editFormData.expiry_date} // Bind to formatted date
-                                onChange={handleEditFormChange}
-                                required
-                            />
+                            <input className="input input-bordered w-full" type="date" name="expiry_date" value={editFormData.expiry_date} onChange={handleEditFormChange} required />
                             <div className="modal-action">
                                 <button type="button" className="btn" onClick={handleCloseModal}>Cancel</button>
                                 <button type="submit" className="btn btn-primary">Save Changes</button>
                             </div>
                         </form>
                     </div>
-                    {/* Click outside to close */}
-                     <div className="modal-backdrop" onClick={handleCloseModal}></div>
+                    <div className="modal-backdrop" onClick={handleCloseModal}></div>
                 </div>
             )}
         </div>
     );
 }
 
-export default ProductTable;
+export default AllProducts;

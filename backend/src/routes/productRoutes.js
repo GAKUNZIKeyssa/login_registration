@@ -6,7 +6,8 @@ const {
   getProductById,
   updateProduct,
   deleteProduct,
-  searchProducts
+  searchProducts,
+  filterByExpiry
 } = require('../controllers/productController');
 
 // CREATE a product
@@ -16,6 +17,7 @@ router.post('/products', addProduct);
 router.get('/products', getAllProducts);
 
 router.get('/products/search', searchProducts);
+router.get('/products/expiry-filter', filterByExpiry);
 
 // READ a single product by ID
 router.get('/products/:id', getProductById);
